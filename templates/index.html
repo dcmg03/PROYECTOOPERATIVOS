@@ -11,6 +11,14 @@
 
     <!-- jQuery for AJAX -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <style>
+        /* Añadimos un scroll a la sección de procesos completados si excede los 200px */
+        #procesos-completados {
+            max-height: 200px;  /* Altura máxima permitida */
+            overflow-y: auto;   /* Mostrar scroll cuando el contenido excede la altura */
+        }
+    </style>
 </head>
 <body class="bg-light">
 
@@ -21,14 +29,14 @@
             <!-- Formulario para agregar procesos -->
             <div class="col-md-6">
                 <h2>Agregar Proceso</h2>
-                <form method="POST" action="/">
+                <form id="formulario-proceso" method="POST" action="/">
                     <div class="mb-3">
                         <label for="nombre" class="form-label">Nombre del Proceso:</label>
                         <input type="text" id="nombre" name="nombre" class="form-control" required>
                     </div>
 
                     <div class="mb-3">
-                        <label for="tiempo_ejecucion" class="form-label">Tiempo de Ejecución:</label>
+                        <label for="tiempo_ejecucion" class="form-label">Tiempo de Ejecución (en segundos):</label>
                         <input type="number" id="tiempo_ejecucion" name="tiempo_ejecucion" class="form-control" required>
                     </div>
 
@@ -41,42 +49,136 @@
                         </select>
                     </div>
 
-                    <button type="submit" class="btn btn-primary">Agregar Proceso</button>
+                    <button type="submit" id="agregar-proceso-btn" class="btn btn-primary">Agregar Proceso</button>
                 </form>
             </div>
 
             <!-- Estado de las colas -->
             <div class="col-md-6">
                 <h2>Estado de las Colas</h2>
-                <div id="estado-colas" class="bg-white p-3 border rounded">
-                    <!-- Aquí se mostrará el estado de las colas en tiempo real -->
+                <div id="estado-colas" class="row">
+                    <!-- Aquí se mostrarán las colas como cajas -->
+                </div>
+
+                <h2 class="mt-4">Procesos Completados</h2>
+                <div id="procesos-completados" class="bg-light p-3 border rounded">
+                    <!-- Aquí se mostrarán los procesos completados con scroll si es necesario -->
                 </div>
             </div>
         </div>
 
         <div class="text-center mt-4">
             <button id="simular-btn" class="btn btn-success">Iniciar Simulación</button>
+            <button id="parar-simulacion-btn" class="btn btn-warning" disabled>Parar Simulación</button>
+            <button id="reiniciar-simulacion-btn" class="btn btn-danger" disabled>Reiniciar Simulación</button>
+        </div>
+
+        <!-- Mensaje de error si no hay procesos -->
+        <div class="text-center mt-4">
+            <div id="error-message" class="alert alert-danger" style="display: none;">
+                No hay procesos en las colas. Agrega al menos un proceso para iniciar la simulación.
+            </div>
         </div>
     </div>
 
+    <!-- JavaScript para actualizar el estado dinámicamente -->
     <script>
+        let intervalId;  // Para almacenar el ID del intervalo
+
         // Función para actualizar el estado de las colas dinámicamente
         function actualizarEstadoColas() {
             $.getJSON('/estado_procesos', function(data) {
                 let estadoHTML = '';
+                let completadosHTML = '';
+
+                // Agrupar los procesos por cola
+                let colas = [[], [], []];
                 data.forEach(function(proceso) {
-                    estadoHTML += `
-                        <div class="mb-2">
-                            <strong>Proceso ${proceso.nombre}</strong><br>
-                            <span>Tiempo Restante: ${proceso.tiempo_restante}</span><br>
-                            <span>Cola: ${proceso.nivel_cola + 1}</span><br>
-                            <span>Estado: ${proceso.estado}</span>
-                        </div>
-                        <hr>
-                    `;
+                    if (proceso.estado === 'Completado') {
+                        completadosHTML += `
+                            <div class="mb-2">
+                                <strong>Proceso ${proceso.nombre}</strong><br>
+                                <span>Tiempo Total: ${proceso.tiempo_total}</span><br>
+                                <span>Estado: ${proceso.estado}</span>
+                            </div>
+                            <hr>
+                        `;
+                    } else {
+                        colas[proceso.nivel_cola].push(proceso);
+                    }
                 });
-                $('#estado-colas').html(estadoHTML);
+
+                // Generar HTML para las colas
+                for (let i = 0; i < colas.length; i++) {
+                    estadoHTML += `
+                        <div class="col-md-4">
+                            <div class="card mb-3">
+                                <div class="card-header">Cola ${i+1}</div>
+                                <div class="card-body">
+                    `;
+                    if (colas[i].length === 0) {
+                        estadoHTML += '<p>No hay procesos en esta cola</p>';
+                    } else {
+                        colas[i].forEach(function(proceso) {
+                            estadoHTML += `
+                                <div class="mb-2">
+                                    <strong>Proceso ${proceso.nombre}</strong><br>
+                                    <span>Tiempo Restante: ${proceso.tiempo_restante}</span><br>
+                                    <span>Estado: ${proceso.estado}</span>
+                                </div>
+                                <hr>
+                            `;
+                        });
+                    }
+                    estadoHTML += `
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Actualizar las colas y los procesos completados en el HTML
+                $('#estado-colas').html(estadoHTML);  // Aquí actualizamos las colas
+                $('#procesos-completados').html(completadosHTML);  // Aquí actualizamos los procesos completados
             });
+        }
+
+        // Función para verificar si hay procesos en las colas
+        function hayProcesosEnColas(callback) {
+            $.getJSON('/estado_procesos', function(data) {
+                let hayProcesos = false;
+                data.forEach(function(proceso) {
+                    if (proceso.tiempo_restante > 0) {
+                        hayProcesos = true;
+                    }
+                });
+
+                if (!hayProcesos) {
+                    $('#error-message').show();  // Mostrar mensaje de error si no hay procesos
+                } else {
+                    $('#error-message').hide();  // Ocultar mensaje de error si hay procesos
+                    callback();  // Iniciar la simulación si hay procesos
+                }
+            });
+        }
+
+        // Función para iniciar la simulación
+        function iniciarSimulacion() {
+            console.log("Simulación iniciada");
+
+            // Deshabilitar el formulario de agregar proceso y su botón
+            $('#agregar-proceso-btn').attr('disabled', true);
+            $('#nombre').attr('disabled', true);
+            $('#tiempo_ejecucion').attr('disabled', true);
+            $('#nivel_cola').attr('disabled', true);
+
+            // Deshabilitar el botón de iniciar y habilitar los botones de parar y reiniciar
+            $('#simular-btn').attr('disabled', true);
+            $('#parar-simulacion-btn').attr('disabled', false);
+            $('#reiniciar-simulacion-btn').attr('disabled', false);
+
+            // Iniciar la simulación
+            intervalId = setInterval(simular, 1000);  // Simula cada 1 segundo
         }
 
         // Función para simular la ejecución cada segundo
@@ -90,7 +192,45 @@
 
         // Iniciar simulación cuando se presione el botón
         $('#simular-btn').on('click', function() {
-            setInterval(simular, 1000);  // Simula cada 1 segundo
+            hayProcesosEnColas(iniciarSimulacion);  // Verificar si hay procesos antes de iniciar la simulación
+        });
+
+        // Parar la simulación
+        $('#parar-simulacion-btn').on('click', function() {
+            console.log("Simulación parada");
+            clearInterval(intervalId);  // Detenemos la simulación
+
+            // Habilitar el formulario de agregar proceso nuevamente
+            $('#agregar-proceso-btn').attr('disabled', false);
+            $('#nombre').attr('disabled', false);
+            $('#tiempo_ejecucion').attr('disabled', false);
+            $('#nivel_cola').attr('disabled', false);
+
+            // Habilitar el botón de iniciar y deshabilitar el botón de parar
+            $('#simular-btn').attr('disabled', false);
+            $('#parar-simulacion-btn').attr('disabled', true);
+        });
+
+        // Reiniciar la simulación
+        $('#reiniciar-simulacion-btn').on('click', function() {
+            console.log("Simulación reiniciada");
+
+            // Limpiar el estado de las colas y los procesos completados
+            $('#estado-colas').html('<div class="col-md-4"><div class="card mb-3"><div class="card-header">Cola 1</div><div class="card-body"><p>No hay procesos en esta cola</p></div></div></div><div class="col-md-4"><div class="card mb-3"><div class="card-header">Cola 2</div><div class="card-body"><p>No hay procesos en esta cola</p></div></div></div><div class="col-md-4"><div class="card mb-3"><div class="card-header">Cola 3</div><div class="card-body"><p>No hay procesos en esta cola</p></div></div></div>');
+            $('#procesos-completados').html('');
+
+            // Habilitar el formulario de agregar proceso y sus campos
+            $('#agregar-proceso-btn').attr('disabled', false);
+            $('#nombre').attr('disabled', false);
+            $('#tiempo_ejecucion').attr('disabled', false);
+            $('#nivel_cola').attr('disabled', false);
+
+            // Deshabilitar los botones de parar y reiniciar
+            $('#simular-btn').attr('disabled', false);
+            $('#parar-simulacion-btn').attr('disabled', true);
+            $('#reiniciar-simulacion-btn').attr('disabled', true);
+
+            clearInterval(intervalId);  // Detenemos cualquier intervalo activo
         });
 
         // Actualizar estado de las colas cada segundo

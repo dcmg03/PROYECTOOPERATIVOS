@@ -35,6 +35,7 @@ def estado_procesos():
             procesos_estado.append({
                 'nombre': proceso.nombre,
                 'tiempo_restante': proceso.tiempo_restante,
+                'tiempo_total': proceso.tiempo_total,  # El tiempo total permanece constante
                 'nivel_cola': proceso.nivel_cola,
                 'estado': proceso.estado
             })

@@ -1,8 +1,8 @@
 class Proceso:
     def __init__(self, nombre, tiempo_ejecucion, nivel_cola):
         self.nombre = nombre
-        self.tiempo_restante = tiempo_ejecucion
-        self.tiempo_total = tiempo_ejecucion
+        self.tiempo_restante = tiempo_ejecucion  # Tiempo que va disminuyendo
+        self.tiempo_total = tiempo_ejecucion  # El tiempo total permanece constante
         self.nivel_cola = nivel_cola
         self.estado = "Nuevo"  # Estado inicial del proceso
 
@@ -37,5 +37,5 @@ class Cola:
                 proceso.estado = "Completado"
 
 
-# Inicializa las colas de MLFQ (esto será manejado desde el archivo app.py)
+# Inicializa las colas de MLFQ
 colas = [Cola(quantum=4), Cola(quantum=8), Cola(quantum=12)]
