@@ -1,54 +1,66 @@
-from flask import Flask, render_template, request, jsonify
-from mlfq_algorithm import Proceso, Cola
+from flask import Flask, render_template, jsonify, request
 
 app = Flask(__name__)
 
-# Inicializar colas del MLFQ
-colas = [Cola(quantum=4), Cola(quantum=8), Cola(quantum=12)]
+# Definir las colas y sus quantums
+colas = [
+    {'nombre': 'Cola 1', 'quantum': 4},
+    {'nombre': 'Cola 2', 'quantum': 8},
+    {'nombre': 'Cola 3', 'quantum': 12}
+]
 
+# Aquí se guardarán los procesos agregados por el usuario
+procesos = []
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/')
 def index():
-    if request.method == 'POST':
-        # Recibir los datos del formulario
-        nombre = request.form['nombre']
-        tiempo_ejecucion = int(request.form['tiempo_ejecucion'])
-        nivel_cola = int(request.form['nivel_cola'])
+    # Extraer solo los quantums para pasarlos a la plantilla
+    quantumColas = [cola['quantum'] for cola in colas]
+    return render_template('index.html', colas=colas, quantumColas=quantumColas)
 
-        # Crear un nuevo proceso y agregarlo a la cola correspondiente
-        nuevo_proceso = Proceso(nombre, tiempo_ejecucion, nivel_cola)
-        colas[nivel_cola].agregar_proceso(nuevo_proceso)
+@app.route('/agregar_proceso', methods=['POST'])
+def agregar_proceso():
+    nombre = request.form['nombre']
+    tiempo_ejecucion = int(request.form['tiempo_ejecucion'])
+    nivel_cola = int(request.form['nivel_cola'])
 
-        # Renderizar la página con el nuevo proceso
-        return render_template('index.html', colas=colas)
+    # Crear un proceso nuevo
+    proceso = {
+        'nombre': nombre,
+        'tiempo_restante': tiempo_ejecucion,
+        'nivel_cola': nivel_cola,
+        'estado': 'Nuevo',
+        'tiempo_total': tiempo_ejecucion
+    }
+    procesos.append(proceso)
 
-    # Si el método es GET, simplemente renderiza la página
-    return render_template('index.html', colas=colas)
+    # Retornar un status ok en formato JSON
+    return jsonify({'status': 'ok'}), 200
 
-
-# Nueva ruta para devolver el estado de los procesos en formato JSON
 @app.route('/estado_procesos')
 def estado_procesos():
-    procesos_estado = []
-    for cola in colas:
-        for proceso in cola.procesos:
-            procesos_estado.append({
-                'nombre': proceso.nombre,
-                'tiempo_restante': proceso.tiempo_restante,
-                'tiempo_total': proceso.tiempo_total,  # El tiempo total permanece constante
-                'nivel_cola': proceso.nivel_cola,
-                'estado': proceso.estado
-            })
-    return jsonify(procesos_estado)
+    return jsonify(procesos)
 
-
-# Ruta para simular la ejecución cada segundo (sincrónica)
 @app.route('/simular_tick')
 def simular_tick():
-    for cola in colas:
-        cola.ejecutar_procesos()
-    return jsonify({'status': 'ok'})
+    global procesos
+    for proceso in procesos:
+        if proceso['estado'] != 'Completado':
+            quantum_actual = colas[proceso['nivel_cola']]['quantum']
+            if proceso['tiempo_restante'] > 0:
+                proceso['tiempo_restante'] -= min(quantum_actual, proceso['tiempo_restante'])
+                proceso['estado'] = 'En ejecución'
+            if proceso['tiempo_restante'] <= 0:
+                proceso['estado'] = 'Completado'
+            break  # Simula un tick por proceso
 
+    return jsonify({'status': 'ok'}), 200
+
+@app.route('/reiniciar_simulacion', methods=['POST'])
+def reiniciar_simulacion():
+    global procesos
+    procesos = []
+    return jsonify({'status': 'ok'}), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
