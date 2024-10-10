@@ -1,42 +1,57 @@
-class Proceso:
-    def __init__(self, nombre, tiempo_ejecucion, nivel_cola):
-        self.nombre = nombre
-        self.tiempo_restante = tiempo_ejecucion
-        self.nivel_cola = nivel_cola
-        self.estado = 'Nuevo'
-        self.tiempo_total = tiempo_ejecucion
+import random
 
+# Definir las colas con sus quantums
+colas = [
+    {'nombre': 'Cola 1', 'quantum': 4, 'procesos': []},
+    {'nombre': 'Cola 2', 'quantum': 8, 'procesos': []},
+    {'nombre': 'Cola 3', 'quantum': 12, 'procesos': []}
+]
 
-class MLFQ:
-    def __init__(self, colas):
-        self.colas = colas  # Cada cola tiene un quantum asignado
-        self.procesos = []
+procesos = []
+completados = []
 
-    def agregar_proceso(self, nombre, tiempo_ejecucion, nivel_cola):
-        proceso = Proceso(nombre, tiempo_ejecucion, nivel_cola)
-        self.procesos.append(proceso)
+def generar_procesos_random(n):
+    global procesos
+    procesos = []
+    for i in range(1, n + 1):
+        tiempo_ejecucion = random.randint(5, 20)
+        procesos.append({
+            'id': i,
+            'nombre': f'Proceso {i}',
+            'tiempo_restante': tiempo_ejecucion,
+            'tiempo_total': tiempo_ejecucion,
+            'estado': 'Nuevo',
+            'nivel_cola': 0,  # Inician en la Cola 1
+            'color': 'bg-primary'  # Color inicial
+        })
+        colas[0]['procesos'].append(procesos[-1])  # Agregar a la primera cola
 
-    def ejecutar_procesos(self):
-        # Iterar sobre los procesos y simular la ejecución según el quantum de la cola
-        for proceso in self.procesos:
-            if proceso.estado != 'Completado':
-                quantum_actual = self.colas[proceso.nivel_cola]['quantum']
+def simular_mlfq():
+    global procesos, completados
+    for cola in colas:
+        if cola['procesos']:
+            proceso = cola['procesos'][0]
+            quantum_actual = cola['quantum']
 
-                # Simular la ejecución del proceso según el quantum
-                if proceso.tiempo_restante > 0:
-                    tiempo_ejecutado = min(quantum_actual, proceso.tiempo_restante)
-                    proceso.tiempo_restante -= tiempo_ejecutado
-                    proceso.estado = 'En ejecución'
+            # Ejecutamos el proceso por un quantum
+            if proceso['tiempo_restante'] > 0:
+                tiempo_ejecucion = min(quantum_actual, proceso['tiempo_restante'])
+                proceso['tiempo_restante'] -= tiempo_ejecucion
+                proceso['estado'] = 'En ejecución'
 
-                # Si el proceso se ha completado
-                if proceso.tiempo_restante <= 0:
-                    proceso.estado = 'Completado'
+            # Si el proceso termina
+            if proceso['tiempo_restante'] <= 0:
+                proceso['estado'] = 'Completado'
+                completados.append(proceso)
+                cola['procesos'].remove(proceso)
+            else:
+                # Si no termina y está en la última cola
+                if proceso['nivel_cola'] == 2:
+                    cola['procesos'].remove(proceso)  # Se mantiene en la última cola
                 else:
-                    # Si el proceso no ha sido completado y puede bajar a una cola inferior
-                    if proceso.nivel_cola < len(self.colas) - 1:
-                        proceso.nivel_cola += 1
-                break  # Simular un tick por cada proceso, en cada llamada
-
-    def reiniciar(self):
-        # Reiniciar la lista de procesos
-        self.procesos = []
+                    # Degradamos el proceso a la siguiente cola
+                    cola['procesos'].remove(proceso)
+                    proceso['nivel_cola'] += 1
+                    proceso['color'] = 'bg-warning' if proceso['nivel_cola'] == 1 else 'bg-danger'
+                    colas[proceso['nivel_cola']]['procesos'].append(proceso)
+            break  # Solo simulamos un tick por cola

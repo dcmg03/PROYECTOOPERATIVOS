@@ -1,65 +1,36 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, jsonify, request, render_template
+from mlfq_algorithm import generar_procesos_random, simular_mlfq, procesos, colas, completados
 
 app = Flask(__name__)
 
-# Definir las colas y sus quantums
-colas = [
-    {'nombre': 'Cola 1', 'quantum': 4},
-    {'nombre': 'Cola 2', 'quantum': 8},
-    {'nombre': 'Cola 3', 'quantum': 12}
-]
-
-# Aquí se guardarán los procesos agregados por el usuario
-procesos = []
-
 @app.route('/')
 def index():
-    # Extraer solo los quantums para pasarlos a la plantilla
-    quantumColas = [cola['quantum'] for cola in colas]
-    return render_template('index.html', colas=colas, quantumColas=quantumColas)
+    return render_template('index.html')
 
-@app.route('/agregar_proceso', methods=['POST'])
-def agregar_proceso():
-    nombre = request.form['nombre']
-    tiempo_ejecucion = int(request.form['tiempo_ejecucion'])
-    nivel_cola = int(request.form['nivel_cola'])
+@app.route('/generar_procesos', methods=['POST'])
+def generar_procesos():
+    generar_procesos_random(5)  # Generar 5 procesos aleatorios por defecto
+    return jsonify({'status': 'ok', 'procesos': procesos}), 200
 
-    # Crear un proceso nuevo
-    proceso = {
-        'nombre': nombre,
-        'tiempo_restante': tiempo_ejecucion,
-        'nivel_cola': nivel_cola,
-        'estado': 'Nuevo',
-        'tiempo_total': tiempo_ejecucion
-    }
-    procesos.append(proceso)
-
-    # Retornar un status ok en formato JSON
-    return jsonify({'status': 'ok'}), 200
-
-@app.route('/estado_procesos')
+@app.route('/estado_procesos', methods=['GET'])
 def estado_procesos():
-    return jsonify(procesos)
+    return jsonify({
+        'colas': colas,
+        'completados': completados
+    })
 
-@app.route('/simular_tick')
+@app.route('/simular_tick', methods=['GET'])
 def simular_tick():
-    global procesos
-    for proceso in procesos:
-        if proceso['estado'] != 'Completado':
-            quantum_actual = colas[proceso['nivel_cola']]['quantum']
-            if proceso['tiempo_restante'] > 0:
-                proceso['tiempo_restante'] -= min(quantum_actual, proceso['tiempo_restante'])
-                proceso['estado'] = 'En ejecución'
-            if proceso['tiempo_restante'] <= 0:
-                proceso['estado'] = 'Completado'
-            break  # Simula un tick por proceso
-
-    return jsonify({'status': 'ok'}), 200
+    simular_mlfq()  # Ejecutamos un tick de la simulación
+    return jsonify({'status': 'ok', 'procesos': procesos}), 200
 
 @app.route('/reiniciar_simulacion', methods=['POST'])
 def reiniciar_simulacion():
-    global procesos
+    global procesos, completados
     procesos = []
+    completados = []
+    for cola in colas:
+        cola['procesos'] = []
     return jsonify({'status': 'ok'}), 200
 
 if __name__ == '__main__':
