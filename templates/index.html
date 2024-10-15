@@ -90,7 +90,6 @@
 
     <!-- Control Buttons -->
     <div class="text-center mt-4">
-        <button id="generar-procesos-btn" class="btn btn-primary"><i class="fas fa-cogs"></i> Generar Procesos</button>
         <button id="iniciar-simulacion-btn" class="btn btn-success"><i class="fas fa-play"></i> Iniciar Simulación</button>
         <button id="pausar-simulacion-btn" class="btn btn-warning"><i class="fas fa-pause"></i> Pausar Simulación</button>
         <button id="reiniciar-simulacion-btn" class="btn btn-danger"><i class="fas fa-redo"></i> Reiniciar Simulación</button>
@@ -101,12 +100,23 @@
     function actualizarEstadoColas() {
         $.get('/estado_procesos', function (data) {
             let colasHTML = '';
+            let procesoEnEjecucion = false;  // Bandera para asegurarnos de que solo un proceso esté en ejecución
+
             data.colas.forEach(function (cola, index) {
                 let procesosHTML = '';
+
+                // Recorremos los procesos de cada cola
                 cola.procesos.forEach(function (proceso) {
                     let progreso = ((proceso.tiempo_total - proceso.tiempo_restante) / proceso.tiempo_total) * 100;
-                    let estadoColor = proceso.estado === 'En ejecución' ? 'estado-ejecucion' : 'estado-espera';
-                    if (proceso.estado === 'Completado') estadoColor = 'estado-completado';
+                    let estadoColor = 'estado-espera';  // Estado por defecto para todos los procesos
+
+                    // Aseguramos que solo un proceso esté en ejecución en la cola con mayor prioridad
+                    if (proceso.estado === 'En ejecución' && !procesoEnEjecucion) {
+                        estadoColor = 'estado-ejecucion';
+                        procesoEnEjecucion = true;  // Solo el primer proceso en ejecución se mostrará como tal
+                    } else if (proceso.estado === 'Completado') {
+                        estadoColor = 'estado-completado';
+                    }
 
                     procesosHTML += `
                         <div class="proceso ${estadoColor} p-3 mb-2 rounded">
@@ -142,9 +152,10 @@
                         </div>
                     </div>`;
             });
+
             $('#estado-colas').html(colasHTML);
 
-            // Completed Processes
+            // Actualizamos la lista de procesos completados
             let completadosHTML = '';
             data.completados.forEach(function (proceso) {
                 completadosHTML += `
@@ -158,12 +169,7 @@
         });
     }
 
-    // Event handlers
-    $('#generar-procesos-btn').click(function () {
-        $.post('/generar_procesos', function () {
-            actualizarEstadoColas();
-        });
-    });
+    // Manejadores de eventos
 
     let intervalId;
     $('#iniciar-simulacion-btn').click(function () {
@@ -185,7 +191,7 @@
         });
     });
 
-    // Auto-update queues every 2 seconds
+    // Auto-actualización de colas cada 2 segundos
     setInterval(actualizarEstadoColas, 2000);
 </script>
 </body>

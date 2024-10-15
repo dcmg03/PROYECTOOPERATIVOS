@@ -28,9 +28,10 @@ def generar_procesos_random(n):
 
 def simular_mlfq():
     global procesos, completados
-    for cola in colas:  # Las colas se procesan en orden de prioridad (1, 2, 3)
+    # Vamos a procesar primero la Cola 1, luego la 2, y finalmente la 3
+    for cola in colas:  # Procesa las colas en orden (1, 2, 3)
         if cola['procesos']:
-            proceso = cola['procesos'][0]
+            proceso = cola['procesos'][0]  # Tomamos el primer proceso de la cola
             quantum_actual = cola['quantum']
 
             # Actualizamos el estado a "En ejecución"
@@ -68,6 +69,7 @@ def simular_mlfq():
     print(f"Procesos completados: {len(completados)}")
     for proceso in completados:
         print(f"  {proceso['nombre']} - Tiempo total: {proceso['tiempo_total']}")
+
 
 def reiniciar_simulacion():
     global procesos, completados, colas
