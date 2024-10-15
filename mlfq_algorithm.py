@@ -1,4 +1,5 @@
 import random
+import time
 
 # Definir las colas con sus quantums
 colas = [
@@ -9,22 +10,28 @@ colas = [
 
 procesos = []
 completados = []
+tiempo_inicial = time.time()  # Marca de tiempo de inicio de la simulación
 
 def generar_procesos_random(n):
     global procesos
     procesos = []
     for i in range(1, n + 1):
         tiempo_ejecucion = random.randint(5, 20)
+        tiempo_llegada = time.time() - tiempo_inicial  # Tiempo de llegada relativo
         procesos.append({
             'id': i,
             'nombre': f'Proceso {i}',
             'tiempo_restante': tiempo_ejecucion,
-            'tiempo_total': tiempo_ejecucion,
+            'tiempo_total': tiempo_ejecucion,  # Tiempo de ejecución original
+            'tiempo_espera': 0,  # Inicializamos el tiempo de espera en 0
             'estado': 'Nuevo',
             'nivel_cola': 0,  # Inician en la Cola 1
-            'color': 'bg-primary'  # Color inicial
+            'color': 'bg-primary',  # Color inicial
+            'tiempo_retorno': 0,  # Inicializamos el tiempo de retorno en 0
+            'tiempo_llegada': tiempo_llegada  # Guardamos el tiempo de llegada
         })
     colas[0]['procesos'] = procesos.copy()  # Todos los procesos inician en la Cola 1
+
 
 def simular_mlfq():
     global procesos, completados
@@ -44,6 +51,11 @@ def simular_mlfq():
             # Si el proceso termina
             if proceso['tiempo_restante'] <= 0:
                 proceso['estado'] = 'Completado'
+
+                # Tiempo de retorno correcto
+                proceso['tiempo_retorno'] = proceso['tiempo_espera'] + proceso[
+                    'tiempo_total']  # Tiempo de ejecución + Tiempo de espera
+
                 completados.append(proceso)
                 cola['procesos'].pop(0)  # Retiramos el proceso completado de la cola
             else:
@@ -57,22 +69,18 @@ def simular_mlfq():
                     # Si está en la última cola, lo movemos al final de esta cola
                     cola['procesos'].append(cola['procesos'].pop(0))
 
+            # Actualizar el tiempo de espera de los procesos que no están en ejecución
+            for c in colas:
+                for p in c['procesos']:
+                    if p != proceso:  # Si no es el proceso que está en ejecución
+                        p['tiempo_espera'] += quantum_actual  # Incrementamos el tiempo de espera en el quantum actual
+
             # Solo procesamos un proceso por iteración, respetando la prioridad de las colas
             break
 
-    # Actualizamos el estado de los procesos en espera
-    for cola in colas:
-        for proceso in cola['procesos'][1:]:  # Todos excepto el primero en ejecución
-            proceso['estado'] = 'En espera'
-
-    # Imprimir el estado de los procesos completados (opcional para ver el progreso en consola)
-    print(f"Procesos completados: {len(completados)}")
-    for proceso in completados:
-        print(f"  {proceso['nombre']} - Tiempo total: {proceso['tiempo_total']}")
-
 
 def reiniciar_simulacion():
-    global procesos, completados, colas
+    global procesos, completados, colas, tiempo_inicial
 
     # Reiniciar las colas y procesos
     for cola in colas:
@@ -80,6 +88,7 @@ def reiniciar_simulacion():
 
     procesos = []
     completados = []
+    tiempo_inicial = time.time()  # Reiniciar el tiempo inicial de la simulación
 
     # Generar nuevos procesos
     generar_procesos_random(5)
