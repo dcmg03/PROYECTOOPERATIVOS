@@ -2,14 +2,13 @@ import random
 
 # Definir las colas con sus quantums
 colas = [
-    {'nombre': 'Cola 1', 'quantum': 4, 'procesos': []},
+    {'nombre': 'Cola 1', 'quantum': 4, 'procesos': []},  # Prioridad más alta
     {'nombre': 'Cola 2', 'quantum': 8, 'procesos': []},
-    {'nombre': 'Cola 3', 'quantum': 12, 'procesos': []}
+    {'nombre': 'Cola 3', 'quantum': 12, 'procesos': []}  # Prioridad más baja
 ]
 
 procesos = []
 completados = []
-
 
 def generar_procesos_random(n):
     global procesos
@@ -27,10 +26,9 @@ def generar_procesos_random(n):
         })
     colas[0]['procesos'] = procesos.copy()  # Todos los procesos inician en la Cola 1
 
-
 def simular_mlfq():
     global procesos, completados
-    for i, cola in enumerate(colas):
+    for cola in colas:  # Las colas se procesan en orden de prioridad (1, 2, 3)
         if cola['procesos']:
             proceso = cola['procesos'][0]
             quantum_actual = cola['quantum']
@@ -46,62 +44,52 @@ def simular_mlfq():
             if proceso['tiempo_restante'] <= 0:
                 proceso['estado'] = 'Completado'
                 completados.append(proceso)
-                cola['procesos'].pop(0)
+                cola['procesos'].pop(0)  # Retiramos el proceso completado de la cola
             else:
                 # Si no termina y no está en la última cola, lo movemos a la siguiente
-                if i < len(colas) - 1:
-                    cola['procesos'].pop(0)
-                    proceso['nivel_cola'] = i + 1
-                    proceso['color'] = 'bg-warning' if i == 0 else 'bg-danger'
-                    colas[i + 1]['procesos'].append(proceso)
+                if cola != colas[-1]:  # Si no es la última cola
+                    cola['procesos'].pop(0)  # Retiramos de la cola actual
+                    proceso['nivel_cola'] += 1  # Aumenta el nivel de la cola
+                    proceso['color'] = 'bg-warning' if proceso['nivel_cola'] == 1 else 'bg-danger'
+                    colas[proceso['nivel_cola']]['procesos'].append(proceso)  # Lo movemos a la siguiente cola
                 else:
                     # Si está en la última cola, lo movemos al final de esta cola
                     cola['procesos'].append(cola['procesos'].pop(0))
 
-            # Solo procesamos un proceso por iteración
+            # Solo procesamos un proceso por iteración, respetando la prioridad de las colas
             break
 
     # Actualizamos el estado de los procesos en espera
     for cola in colas:
-        for proceso in cola['procesos'][1:]:  # Todos excepto el primero
+        for proceso in cola['procesos'][1:]:  # Todos excepto el primero en ejecución
             proceso['estado'] = 'En espera'
 
+    # Imprimir el estado de los procesos completados (opcional para ver el progreso en consola)
     print(f"Procesos completados: {len(completados)}")
     for proceso in completados:
         print(f"  {proceso['nombre']} - Tiempo total: {proceso['tiempo_total']}")
 
-
 def reiniciar_simulacion():
     global procesos, completados, colas
 
-    print("Antes de reiniciar - Completados:", len(completados))
-
-    # Reiniciar las colas
+    # Reiniciar las colas y procesos
     for cola in colas:
         cola['procesos'] = []
 
-    # Reiniciar los procesos y completados
     procesos = []
     completados = []
 
     # Generar nuevos procesos
     generar_procesos_random(5)
-
-    # Asegurar que todos los nuevos procesos estén en la primera cola
     colas[0]['procesos'] = procesos.copy()
 
-    print("Después de reiniciar - Completados:", len(completados))
-    print("Procesos generados:", len(procesos))
-    print("Procesos en Cola 1:", len(colas[0]['procesos']))
-    print("Reinicio completado con éxito")
-
+    print("Simulación reiniciada correctamente.")
 
 def obtener_estado_simulacion():
     return {
         'colas': colas,
         'completados': completados
     }
-
 
 # Inicialización inicial
 generar_procesos_random(5)
